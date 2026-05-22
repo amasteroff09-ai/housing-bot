@@ -31,24 +31,84 @@ model.fit(X_train_scaled, y_train)
 
 print("✅ Модель готова!")
 
-FEATURES = ['CRIM', 'ZN', 'INDUS', 'CHAS', 'NOX', 'RM', 'AGE', 'DIS', 'RAD', 'TAX', 'PTRATIO', 'B', 'LSTAT']
-DEFAULTS = [0.1, 12.0, 8.0, 0, 0.5, 6.5, 65.0, 4.0, 5.0, 300.0, 15.0, 350.0, 12.0]
+# ПРИЗНАКИ С ПОНЯТНЫМИ РУССКИМИ НАЗВАНИЯМИ
+FEATURES_RU = [
+    "Уровень преступности (CRIM)",
+    "Доля земли под жильё (ZN)",
+    "Доля нежилых зон (INDUS)",
+    "Рядом река? 1-да, 0-нет (CHAS)",
+    "Концентрация оксидов азота (NOX)",
+    "Среднее кол-во комнат (RM)",
+    "Доля старых домов >1940г (AGE)",
+    "Удалённость от работы (DIS)",
+    "Доступность магистралей (RAD)",
+    "Ставка налога (TAX)",
+    "Учеников на учителя (PTRATIO)",
+    "Поправка (B)",
+    "Доля населения с низким статусом (LSTAT)"
+]
+
+# ПОДСКАЗКИ (средние значения)
+DEFAULTS_RU = [
+    0.1,    # CRIM
+    12.0,   # ZN
+    8.0,    # INDUS
+    0,      # CHAS
+    0.5,    # NOX
+    6.5,    # RM
+    65.0,   # AGE
+    4.0,    # DIS
+    5.0,    # RAD
+    300.0,  # TAX
+    15.0,   # PTRATIO
+    350.0,  # B
+    12.0    # LSTAT
+]
+
+# КРАТКИЕ ОПИСАНИЯ ДЛЯ ПОДСКАЗКИ
+HINTS = [
+    "Чем выше, тем ниже цена",
+    "Чем выше, тем лучше",
+    "Чем выше, тем хуже",
+    "1 - рядом река, цена выше",
+    "Чем ниже, тем лучше",
+    "Чем больше, тем выше цена",
+    "Чем ниже, тем лучше",
+    "Чем ниже, тем лучше",
+    "Чем выше, тем хуже",
+    "Чем выше, тем хуже",
+    "Чем ниже, тем лучше",
+    "(лучше не менять)",
+    "Чем выше, тем ниже цена"
+]
+
 user_data = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🏡 *HomeValue Predictor Bot*\n\n"
-        "🔹 /predict - прогноз стоимости\n"
-        "🔹 /accuracy - точность модели",
+        "Я предсказываю стоимость дома в Бостоне на основе 13 параметров.\n\n"
+        "🔹 /predict - начать прогноз\n"
+        "🔹 /accuracy - точность модели\n\n"
+        "📌 *Как работает:*\n"
+        "Я задам 13 вопросов о районе и доме. Отвечайте числами.\n"
+        "В конце вы получите примерную стоимость!",
         parse_mode='Markdown'
     )
 
 async def accuracy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "📊 *Точность модели Random Forest*\n\n"
-        "• R² = 0.89\n"
-        "• RMSE = 3.25 тыс. $\n"
-        "• MAE = 2.25 тыс. $",
+        "Модель обучена на 506 домах Бостона.\n\n"
+        "┌─────────────────────────────────────┐\n"
+        "│ 📈 *Метрики качества:*               │\n"
+        "│                                     │\n"
+        "│ • R² = 0.89 (89% точности)          │\n"
+        "│ • RMSE = 3.25 тыс. долларов         │\n"
+        "│ • MAE = 2.25 тыс. долларов          │\n"
+        "└─────────────────────────────────────┘\n\n"
+        "🔥 *Random Forest* — самый точный алгоритм\n"
+        "из 5 исследованных!",
         parse_mode='Markdown'
     )
 
@@ -59,9 +119,12 @@ async def predict_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def ask_parameter(update):
     user = user_data[update.effective_user.id]
     step = user['step']
-    if step < len(FEATURES):
+    if step < len(FEATURES_RU):
         await update.message.reply_text(
-            f"📝 *{FEATURES[step]}*\n\n📌 Пример: {DEFAULTS[step]}\n\nВведите значение:",
+            f"📝 *{FEATURES_RU[step]}*\n\n"
+            f"💡 {HINTS[step]}\n"
+            f"📌 *Пример:* {DEFAULTS_RU[step]}\n\n"
+            f"Введите значение:",
             parse_mode='Markdown'
         )
     else:
@@ -70,7 +133,7 @@ async def ask_parameter(update):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_data:
-        await update.message.reply_text("Введите /predict для начала")
+        await update.message.reply_text("⚠️ Введите /predict для начала")
         return
     
     try:
@@ -79,7 +142,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]['step'] += 1
         await ask_parameter(update)
     except:
-        await update.message.reply_text("❌ Ошибка! Введите число (например, 0.1)")
+        await update.message.reply_text(
+            "❌ *Ошибка!* Введите число (например, 0.1)\n\n"
+            "Используйте точку, а не запятую.",
+            parse_mode='Markdown'
+        )
 
 async def calculate_prediction(update):
     user = user_data[update.effective_user.id]
@@ -87,10 +154,29 @@ async def calculate_prediction(update):
     values_scaled = scaler.transform(values)
     prediction = model.predict(values_scaled)[0]
     
+    # Оценка стоимости
+    if prediction < 15:
+        price_level = "🏚️ *Низкая* (эконом)"
+    elif prediction < 25:
+        price_level = "🏠 *Средняя*"
+    else:
+        price_level = "🏰 *Высокая* (премиум)"
+    
     await update.message.reply_text(
         f"🏡 *РЕЗУЛЬТАТ ПРОГНОЗА*\n\n"
-        f"💰 *{prediction:.1f} тыс. долларов*\n"
-        f"≈ *{prediction * 1000:,.0f} $*\n\n"
+        f"┌─────────────────────────────────┐\n"
+        f"│                                 │\n"
+        f"│   💰 *{prediction:.1f} тыс. долларов*    │\n"
+        f"│                                 │\n"
+        f"│   ≈ *{prediction * 1000:,.0f} $*        │\n"
+        f"│                                 │\n"
+        f"│   {price_level}                 │\n"
+        f"│                                 │\n"
+        f"└─────────────────────────────────┘\n\n"
+        f"📌 *Сравнение с рынком Бостона:*\n"
+        f"• Минимум: 5 тыс. $\n"
+        f"• Максимум: 50 тыс. $\n"
+        f"• Среднее: 22.5 тыс. $\n\n"
         f"Введите /predict для нового прогноза",
         parse_mode='Markdown'
     )
