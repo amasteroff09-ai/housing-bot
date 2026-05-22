@@ -13,114 +13,80 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-print("🔄 Загрузка данных и обучение модели (Москва)...")
+print("🔄 Загрузка данных...")
 
-# Загрузка данных
 df = pd.read_csv('moscow_housing.csv')
-
 X = df.drop('price', axis=1).values
 y = df['price'].values
 
-# Разделение на train/test
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Масштабирование
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
-# Обучение модели
 model = RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42)
 model.fit(X_train_scaled, y_train)
 
-# Оценка качества
 y_pred = model.predict(X_test_scaled)
 mae = mean_absolute_error(y_test, y_pred)
 r2 = r2_score(y_test, y_pred)
 
 print(f"✅ Модель готова! R² = {r2:.3f}, MAE = {mae:.1f} млн ₽")
-print(f"📊 Всего квартир в базе: {len(df)}")
-print(f"💰 Цены: от {y.min():.1f} до {y.max():.1f} млн ₽")
 
-# ПРИЗНАКИ ДЛЯ МОСКВЫ
 FEATURES_RU = [
     "Площадь (кв.м)",
     "Количество комнат",
     "Этаж",
-    "Этажность дома",
+    "Этажность дома (всего 24)",
     "До метро пешком (мин)",
     "Год постройки",
-    "Район (1-ЮЗАО, 2-ЦАО, 3-САО)"
+    "Район (1-ЦАО, 2-ЗАО/ЮЗАО, 3-спальные)"
 ]
 
 RANGES = [
-    "30-85 кв.м",
-    "1-3 комнаты",
-    "2-13 этаж",
-    "9-18 этажей",
-    "3-22 минуты",
-    "2003-2023",
+    "10-80 кв.м",
+    "1-5 комнат",
+    "1-24 этаж",
+    "24 этажа",
+    "2-25 минут",
+    "2005-2023",
     "1, 2 или 3"
 ]
 
-DEFAULTS_RU = [
-    50,    # площадь
-    2,     # комнаты
-    7,     # этаж
-    14,    # этажность
-    10,    # метро
-    2015,  # год
-    1      # район
-]
-
-HINTS = [
-    "Чем больше, тем дороже (+1.5 млн за 10 м²)",
-    "1-комнатная ≈12-15 млн, 2-комнатная ≈18-22 млн",
-    "Лучше выше 5-го этажа",
-    "Новостройки (16-18 этажей) дороже",
-    "Чем ближе, тем дороже (от 3 мин — премиум)",
-    "Новостройки после 2020 дороже на 30%",
-    "ЦАО самый дорогой, ЮЗАО средний, САО доступнее"
-]
+DEFAULTS_RU = [50, 2, 12, 24, 10, 2015, 3]
 
 user_data = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🏠 *Московский HomeValue Predictor*\n\n"
-        "Я предсказываю стоимость квартиры в Москве на основе 7 параметров.\n\n"
-        f"📊 *База данных:* {len(df)} реальных квартир\n"
-        f"💰 *Диапазон цен:* {y.min():.1f} - {y.max():.1f} млн ₽\n\n"
+        "Предсказываю стоимость квартиры в Москве.\n\n"
         "🔹 /predict - начать прогноз\n"
         "🔹 /accuracy - точность модели\n"
         "🔹 /ranges - диапазоны значений\n\n"
-        "📌 *Как работает:*\n"
-        "Я задам 7 вопросов — вы получите примерную цену квартиры!",
+        "📌 *Цены в Москве:*\n"
+        "• 1-комнатная: от 8 млн ₽\n"
+        "• 2-комнатная: от 9 млн ₽\n"
+        "• 3-комнатная: от 9.7 млн ₽\n"
+        "• 4-комнатная: от 16 млн ₽\n"
+        "• 5-комнатная: от 24 млн ₽",
         parse_mode='Markdown'
     )
 
 async def show_ranges(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = "📊 *ДИАПАЗОНЫ ЗНАЧЕНИЙ (Москва)*\n\n"
+    msg = "📊 *Диапазоны значений*\n\n"
     for i, name in enumerate(FEATURES_RU):
         msg += f"• *{name}*: {RANGES[i]}\n"
-    msg += f"\n💡 *Всего в базе:* {len(df)} квартир\n"
-    msg += f"💰 *Цены:* от {y.min():.1f} до {y.max():.1f} млн ₽"
     await update.message.reply_text(msg, parse_mode='Markdown')
 
 async def accuracy(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📊 *Точность модели Random Forest*\n\n"
-        f"🏠 *Квартир в базе:* {len(df)}\n"
-        f"📍 *Город:* Москва\n\n"
-        "┌─────────────────────────────────────┐\n"
-        f"│ 📈 *Метрики качества:*               │\n"
-        f"│                                     │\n"
-        f"│ • R² = {r2:.3f} ({r2*100:.1f}% точности)     │\n"
-        f"│ • MAE = {mae:.1f} млн рублей              │\n"
-        f"│ • RMSE ≈ {mae*1.2:.1f} млн рублей            │\n"
-        "└─────────────────────────────────────┘\n\n"
-        "🔥 *Random Forest* — самый точный алгоритм!\n"
-        "💡 *Точность:* ошибка в среднем ±2.5 млн ₽",
+        f"📊 *Точность модели*\n\n"
+        f"• R² = {r2:.3f} ({r2*100:.1f}%)\n"
+        f"• Ошибка = ±{mae:.1f} млн ₽\n\n"
+        f"📊 *База:* {len(df)} квартир\n"
+        f"💰 *Цены:* от {y.min():.1f} до {y.max():.1f} млн ₽",
         parse_mode='Markdown'
     )
 
@@ -134,7 +100,6 @@ async def ask_parameter(update):
     if step < len(FEATURES_RU):
         await update.message.reply_text(
             f"📝 *{FEATURES_RU[step]}*\n\n"
-            f"💡 {HINTS[step]}\n"
             f"📊 *Диапазон:* {RANGES[step]}\n"
             f"📌 *Пример:* {DEFAULTS_RU[step]}\n\n"
             f"Введите значение:",
@@ -146,7 +111,7 @@ async def ask_parameter(update):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_data:
-        await update.message.reply_text("⚠️ Введите /predict для начала")
+        await update.message.reply_text("Введите /predict")
         return
     
     try:
@@ -155,11 +120,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_data[user_id]['step'] += 1
         await ask_parameter(update)
     except:
-        await update.message.reply_text(
-            "❌ *Ошибка!* Введите число (например, 50)\n\n"
-            "Используйте точку, а не запятую.",
-            parse_mode='Markdown'
-        )
+        await update.message.reply_text("❌ Ошибка! Введите число")
 
 async def calculate_prediction(update):
     user = user_data[update.effective_user.id]
@@ -167,38 +128,9 @@ async def calculate_prediction(update):
     values_scaled = scaler.transform(values)
     prediction = model.predict(values_scaled)[0]
     
-    # Оценка стоимости
-    if prediction < 15:
-        price_level = "🏚️ *Доступная* (эконом-класс)"
-        emoji = "🏚️"
-    elif prediction < 22:
-        price_level = "🏠 *Средняя* (комфорт-класс)"
-        emoji = "🏠"
-    else:
-        price_level = "🏰 *Высокая* (бизнес/премиум)"
-        emoji = "🏰"
-    
-    # Сравнение с рынком
-    if prediction < y.mean():
-        vs_market = "ниже среднего по базе"
-    else:
-        vs_market = "выше среднего по базе"
-    
     await update.message.reply_text(
-        f"🏠 *РЕЗУЛЬТАТ ПРОГНОЗА (Москва)*\n\n"
-        f"┌─────────────────────────────────┐\n"
-        f"│                                 │\n"
-        f"│   {emoji} *{prediction:.1f} млн рублей*      │\n"
-        f"│                                 │\n"
-        f"│   *{price_level}*         │\n"
-        f"│                                 │\n"
-        f"└─────────────────────────────────┘\n\n"
-        f"📊 *Статистика по базе данных:*\n"
-        f"• Минимум: {y.min():.1f} млн ₽\n"
-        f"• Максимум: {y.max():.1f} млн ₽\n"
-        f"• Среднее: {y.mean():.1f} млн ₽\n"
-        f"• Ваша цена: {vs_market}\n\n"
-        f"💡 *Совет:* Это прогноз на основе {len(df)} реальных объявлений\n"
+        f"🏠 *Прогноз стоимости:*\n\n"
+        f"💰 *{prediction:.1f} млн рублей*\n\n"
         f"Введите /predict для нового прогноза",
         parse_mode='Markdown'
     )
@@ -212,7 +144,7 @@ def main():
     app.add_handler(CommandHandler("predict", predict_start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    print("🚀 Московский бот запущен на GitHub Actions!")
+    print("🚀 Бот запущен!")
     app.run_polling()
 
 if __name__ == '__main__':
