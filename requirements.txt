@@ -2,3 +2,4 @@ python-telegram-bot==20.7
 numpy
 scikit-learn
 joblib
+pandas
